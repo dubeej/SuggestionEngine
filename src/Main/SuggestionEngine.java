@@ -79,7 +79,7 @@ public class SuggestionEngine {
 	}
 
 	/**
-	 * Generates the profiles database for the g
+	 * Generates the profiles database for the genetic algorithm.
 	 * @param movies
 	 * @param ratings
 	 * @param users
