@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectDescription>
+	<name>SuggestionEngine</name>
+	<comment></comment>
+	<projects>
+	</projects>
+	<buildSpec>
+		<buildCommand>
+			<name>org.eclipse.jdt.core.javabuilder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+	</buildSpec>
+	<natures>
+		<nature>org.eclipse.jdt.core.javanature</nature>
+	</natures>
+	<linkedResources>
+		<link>
+			<name>jars/Test2.txt</name>
+			<type>1</type>
+			<locationURI>PROJECT_LOC/Test2.txt</locationURI>
+		</link>
+		<link>
+			<name>jars/text3.txt</name>
+			<type>1</type>
+			<locationURI>PROJECT_LOC/text3.txt</locationURI>
+		</link>
+	</linkedResources>
+</projectDescription>
