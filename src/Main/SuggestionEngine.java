@@ -1,17 +1,13 @@
 package Main;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Random;
 import java.util.Scanner;
-
 import GA.GA;
 import Movies.Movies;
 import Profile.ProfileData;
 import Profile.Profiles;
 import Rating.MovieRatings;
-import Rating.Prefered;
 import Rating.UserRatingData;
 import Rating.WeightRatings;
 import Users.UserData;
@@ -55,15 +51,19 @@ public class SuggestionEngine {
 		// Load the ratings, movie, and user data. Then train the genetic
 		// algorithm for the active user
 		try {
-			System.out.println("Please provide a user ID to train for.");
-			activeUser = Integer.parseInt(input.nextLine());
-			
 			System.out.println("Loading data...");
 			
 			testSet.load(TEST_SET);
 			trainingSet.load(TRAINING_SET);
 			movies.load(MOVIES);
 			users.load( USERS_DATA);
+			
+			System.out.println("Please provide a user ID to train for.");
+			activeUser = Integer.parseInt(input.nextLine());
+			
+			if (!trainingSet.getUserIDs().contains(activeUser))
+				throw new Exception("The user ID does not exist.");
+			
 			
 			profiles = genProfiles(movies, trainingSet, users);
 			moviesRatedByActiveUser = trainingSet.getRatedMovies(activeUser);
