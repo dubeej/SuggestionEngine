@@ -1,5 +1,6 @@
 package GA;
 
+
 import java.util.ArrayList;
 import java.util.Random;
 
@@ -21,163 +22,59 @@ import Rating.WeightRatings;
  *
  */
 public class GA {
-	private static final float mutationChance = 0.01f;	// Chance of mutations
-	private final int DEFAULT_SIZE = 100;				// Default pop size
+	public final static int DEFAULT_SIZE = 100;			// Default pop size
+	public final static float DEFAULT_MUTATION = 0.01f;	// Default mutation
+	public final static boolean DEFAULT_ELITISM = true;	// Default elitism
 	
-	private static boolean elitism = true;				// Denotes elitism
-	private Population pop;								// Population set
-	private Movies movies;								// Common movies
-	private Prefered prefs;								// User preferences
-	private MovieRatings ratings;						// User ratings
-	private WeightRatings weight;						// User weights
-	private int userID;									// Training user
-	private ArrayList<Integer> movieIDs;				// Common movie IDs	
-	private Random rand;								// Number generator
-	private Profiles neighborSet;
-	private Profiles activeUserSet;
-	
-	
+	private float mutationChance;					// Chance of mutations
+	private boolean elitism;						// Denotes elitism
+	private Population pop;							// Population set
+	private int userID;								// Training user
+	private Random rand;							// Number generator
+	private Profiles neighborSet;					// Neighborhood set
+	private Profiles activeUserSet;					// Active user set
+
 	/**
-	 * Initializes the PMDs to non-default values.
+	 * Sets the PDMs to non-default values.
 	 * 
-	 * @param user				userID to train for
-	 * @param movieIDsRated		Movies rated by the user
-	 * @param attrWeight		Weight of attributes
-	 * @param commonMovies		Details of the rated movies 
-	 * @param userRatings		Neighbors who rated the same movies as the user
-	 * @param userPrefs			Preferences for the users
+	 * @param user					Active user
+	 * @param activeUserProfiles	Profiles for the active user
+	 * @param neighborProfiles		Profiles for the neighbor set
+	 * @param mutation				Mutation chance
+	 * @param elitism				Elitism enabled or disable
+	 * @param popSize				Population size
 	 */
-	public GA(int user, ArrayList<Integer> movieIDsRated, 
-			WeightRatings attrWeight, Movies commonMovies, 
-			MovieRatings userRatings, Prefered userPrefs) {
-		pop = new Population(DEFAULT_SIZE);
-		userID = user;
-		movieIDs = movieIDsRated;
-		movies = commonMovies;
-		weight = attrWeight;
-		ratings = userRatings;
-		prefs = userPrefs;
-		rand = new Random() ;
-	}
-	
-	public GA(int user, Profiles activeUserProfiles, Profiles neighborProfiles) {
-		pop = new Population(DEFAULT_SIZE);
+	public GA(int user, Profiles activeUserProfiles, Profiles neighborProfiles, 
+			float mutation, boolean elitism, int popSize) {
+		pop = new Population(popSize);
 		userID = user;
 		activeUserSet = activeUserProfiles;
 		neighborSet = neighborProfiles;
-		rand = new Random() ;
+		rand = new Random();
+		mutationChance = mutation;
+		this.elitism = elitism;
 	}
 	
 	/**
-	 * Determines the distance between two users based on the value of
-	 * a weight on a movie
+	 * Calculates the distance between two users.
 	 * 
-	 * @param individualIndex		Index of the current individual
-	 * @param neighborID			ID of the neighbor
-	 * @param movieIndex			Index of the movie
-	 * 
-	 * @return						Distance between users for this weight
-	 */
-	private int getDistByDirector(int individualIndex, int neighborID, 
-			int movieIndex) {
-		String [] directors;		// Movie's Directors
-		int weightUser = 0;			// Weight for user
-		int weightNeighbor = 0;		// Weight for neighbor
-		
-		directors = movies.getDirectors(movieIndex);
-		if (directors != null) {
-				
-			// Determine the distance between both users, and the current 
-			// movie based on director preferences
-			for (int k = 0; k < directors.length; k++) {
-				if (directors[k] != null) {
-					if (prefs.getPrefered(userID).getDirector() != null)
-						weightUser = weightUser + (weight.getDirectorRating(prefs.getPrefered(userID).getDirector()) - weight.getDirectorRating(directors[k]));
-					
-					if (prefs.getPrefered(neighborID).getDirector() != null)
-						weightNeighbor = weightNeighbor + (weight.getDirectorRating(prefs.getPrefered(neighborID).getDirector()) - weight.getDirectorRating(directors[k]));
-				}
-			}
-	
-			return (int) (pop.getIndividual(individualIndex).getGene(0) * (weightUser - weightNeighbor));
-		} else
-			return 0;
-	}
-	
-	/**
-	 * Determines the Euclidean distance between the preferences of two users,
-	 * and multiplies a weight from an individual genome by those differences.
-	 * 
-	 * @param individualIndex		Index of an individual in the population
-	 * @param neighborID			Neighbor ID
-	 * @param neighborMovies		Neighbor movies that the user liked
-	 * 
-	 * @return		Returns the distance between the preferences of two users
-	 * 				based on a weight provided by an individual in the 
-	 * 				population.
-	 */
-	private int getEuclideanDist(int individualIndex, int neighborID, 
-			ArrayList<Integer> neighborMovies) {
-		int dist = 0;		// Distance result
-
-		ArrayList<Integer> ratedMovieIDs = ratings.getRatedMovies(neighborID);
-		
-		// For each movie rated by the neighbor and the user, calculate the
-		// distance between the neighbor, and the user preferences
-		for (int i = 0; i < ratedMovieIDs.size();  i++) {
-			dist = dist + getDistByDirector(individualIndex, neighborID, ratedMovieIDs.get(i));
-		}
-			
-		return (int)(Math.sqrt(dist));
-	}
-	
-	/**
-	 * Determines the sum of a user's vote on each rated movie minus the user's
-	 * average vote.
-	 * 
-	 * @param neighborID		ID of the user
-	 * @param ratedMovieIDs		IDs of each movie rated by the user
+	 * @param indiv				Current individual
+	 * @param activeSet			Active movie set
+	 * @param neighborSet		Neighbor movie set
 	 * @return
 	 */
-	private int getVoteMinusMean(int neighborID, ArrayList<Integer> ratedMovieIDs) {
-		int voteMinusMean = 0;	// Total vote minus mean vote for each movie
+	public double calcDist(Individual indiv, ArrayList<ProfileData> activeSet, 
+			ArrayList<ProfileData> neighborSet) {
+		double dist = 0;		// Distance between preferences
 		
-		// Get the vote of the neighbor on each movie
-		for (int i = 0; i < ratedMovieIDs.size(); i++) {
-			voteMinusMean = voteMinusMean +
-					ratings.getRating(neighborID, ratedMovieIDs.get(i)) -  
-					prefs.getPrefered(neighborID).getMeanRating();
-		}
-		
-		return voteMinusMean;
-	}
-	
-	/**
-	 * Predicts the users vote based on the calculated distance.
-	 * 
-	 * @param dist		Distance between two users
-	 * @return			Predicted vote
-	 */
-	private int predictVote(int dist) {
-		int predict;		// Predicted vote
-		
-		predict = (prefs.getPrefered(userID).getMeanRating() + 
-				((dist / ratings.size())));
-		
-		
-		//if (predict > 5)
-		//	predict = predict - 5;
-		
-		return predict;
-	}
-	
-	public double calcDist(Individual indiv, ArrayList<ProfileData> activeSet, ArrayList<ProfileData> neighborSet) {
-		double dist = 0;
-		
+		// Determine the distance for each item in the neighbor movie set
 		for (int i = 0; i < neighborSet.size(); i++) {
+			// Profile data for the current neighbor
 			ProfileData neighbor = (ProfileData)(neighborSet.get(i));
 			
+			// Calculate the distance for each movie in the active movie set
 			for (int j = 0; j < activeSet.size(); j++) {
+				// Profile data for the current active movie
 				ProfileData active = (ProfileData)(activeSet.get(i));
 				
 				if (neighbor.getMovieID() == active.getMovieID()){
@@ -205,11 +102,9 @@ public class GA {
 					neighborGenres = neighbor.getGenresWeight();
 					
 					for (int k = 0; k < 18; k++) {
-						
-						
-						
-						dist = dist + indiv.getGene(4 + k) * (Math.pow(activeGenres[k] - neighborGenres[k], 2)); 
-						
+						dist = dist + indiv.getGene(4 + k) * 
+								(Math.pow(activeGenres[k] - neighborGenres[k], 
+										2)); 	
 					}
 			
 					break;
@@ -224,22 +119,27 @@ public class GA {
 		return (double) Math.sqrt(dist);
 	}
 	
+	/**
+	 * Calculates the fitness for the given population.
+	 * 
+	 * @throws Exception		Divide by zero error
+	 */
 	public void calcFitness() throws Exception {
-		ArrayList<ProfileData> activeUserMovies = activeUserSet.getProfilesForUser(userID);
-		
-		
-		int neighborVote = 0;
-		int neighborAvgVote = 0;
-		double predictedVote;
-		int actualVote;
+		// Profiles for the active user
+		ArrayList<ProfileData> activeUserMovies = 
+				activeUserSet.getProfilesForUser(userID);
+		int neighborVote = 0;		// Neighbor's vote
+		int neighborAvgVote = 0;	// Neighbor's active vote
+		double predictedVote;		// Predicted vote
+		int actualVote;				// Actual vote
 		
 		for (int i = 0; i < pop.size(); i++) {
-			double fitness = 0;
-			double sumDist = 0;
-			double dist2 = 0;
+			double fitness = 0;		// Current fitness
+			double sumDist = 0;		// Sum of distances
+			double dist2 = 0;		
 			double dist;
-			double  pa= 0;
-			int ra =0;
+			double pa = 0;			// Predicted vote average
+			int ra =0;				// Real vote average
 			
 			
 			// Predict vote for each movie in the active user set
@@ -248,14 +148,20 @@ public class GA {
 				
 				neighborSet.beginningOfList();
 				
-				// Calc dist for each neighbor
+				// Calculate distance for each neighbor
 				while(!neighborSet.endOfList()) {
-			
-					ArrayList<ProfileData> commonMovies = neighborSet.getCurrentProfiles();
 					
+					// Common movies from the neighbor
+					ArrayList<ProfileData> commonMovies = 
+							neighborSet.getCurrentProfiles();
 					
+					// Get the current neighbor's vote and mean vote for each
+					// movie
 					for (int k = 0; k < commonMovies.size(); k++) {
-						ProfileData neighbor = (ProfileData)(commonMovies.get(k));
+						// Profile data for the neighbor
+						ProfileData neighbor = 
+								(ProfileData)(commonMovies.get(k));
+						
 						if (neighbor.getMovieID() == active.getMovieID()) {
 							neighborVote = neighbor.getRating();
 							neighborAvgVote = neighbor.getAvgRating();
@@ -263,90 +169,34 @@ public class GA {
 						}
 					}
 					
-					dist = calcDist(pop.getIndividual(i), activeUserMovies, commonMovies);
-
+					dist = calcDist(pop.getIndividual(i), activeUserMovies, 
+							commonMovies);
 					sumDist = sumDist + dist;
-
 					dist2 = dist2 + (dist * (neighborVote - neighborAvgVote));
-
-
 				}
 				
-				
-				//predict
-				// check for div by zero
-		
+				// Can't divide by zero
 				if (sumDist == 0)
 					throw new Exception("Attempt to divide by zero");
 				
 				dist2 = dist2 / sumDist;
 				predictedVote = active.getAvgRating() + dist2;
-				//System.out.println((int) Math.round(active.getAvgRating() + dist2));
-				//System.exit(1);
+				
 				actualVote = active.getRating();
 
 				pa = pa + predictedVote;
 				ra = ra + actualVote;
-				//System.out.println("actualVote: " + actualVote + " predictedVote: " + predictedVote + " fitness: " + fitness);
-				//System.exit(1);
 			}
 		
-			
+			// Calculate the fitness
 			if (ra > pa)
 				fitness = (pa * 100) / ra;
 			else
 				fitness = (ra * 100) / pa;
 	
-			//System.out.println(fitness);
 			pop.getIndividual(i).setFitness(fitness);
-			
-	
-			
 		}
-		
-	
 	}
-	
-	/**
-	 * Determines the fitness for each individual in the population. This is
-	 * done by evaluating the distance between preferences the user and
-	 * neighbors that liked the same movies have.
-	 */
-	/*public void calcFitness() {
-		int neighborID; 				// Neighbor ID number
-		int predictedVote;				// Predicted vote
-		int realVote;					// Actual user vote
-		
-		// For each individual in the population calculate its fitness
-		for (int i = 0; i < pop.size(); i++) {
-			int dist = 0;
-			System.out.println(i);
-			
-			// Predict the vote for each movie liked by the user
-			for (int j = 0; j < movieIDs.size(); j++) {
-				ratings.beginningOfList();
-				
-				// For each neighbor in the neighbor set, determine the distance
-				// between the neighbor and the user based on their preferences
-				while (!ratings.endOfList()) {
-					neighborID = ratings.getCurrentItem();
-					
-					ArrayList<Integer> ratedMovieIDs = ratings.getRatedMovies(neighborID);
-					
-					if (ratedMovieIDs.contains(movieIDs.get(j))) {
-						dist = dist + getEuclideanDist(i, neighborID, ratedMovieIDs) *
-								getVoteMinusMean(neighborID, ratedMovieIDs);
-					}
-				}
-				
-				predictedVote = predictVote(dist);
-				realVote = ratings.getRating(userID, movieIDs.get(j));
-				float fitness = (float)(Math.abs(predictedVote) * 100) / realVote;
-				
-				pop.getIndividual(i).setFitness(fitness);
-			}
-		}
-	}*/
 	
 	/**
 	 * Returns the fittest individual from the population.
@@ -464,6 +314,24 @@ public class GA {
         }
 		
 		return individual;
+	}
+	
+	/**
+	 * Sets elitism to enabled or disabled.
+	 * 
+	 * @param enabled		True to enable elitism. Otherwise, false.
+	 */
+	public void setElitism(boolean enabled) {
+		elitism = enabled;
+	}
+	
+	/**
+	 * Sets the mutation percentage.
+	 * 
+	 * @param mutation		Percentage mutation
+	 */
+	public void setMutation(float mutation) {
+		mutationChance = mutation;
 	}
 
 }
